@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         sxyzzy
 // @namespace    sxyzzy
-// @version      2.3.1
+// @version      2.3.2
 // @author       vettel&fqy
 // @description  山东省教师教育网2025互联网+
 // @match        *://www.qlteacher.com/
