@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         sxyzzy
 // @namespace    sxyzzy
-// @version      2.3.2
+// @version      2.4.1
 // @author       vettel&fqy
 // @description  山东省教师教育网2025互联网+
 // @match        *://www.qlteacher.com/
@@ -15,12 +15,20 @@
 // @updateURL    https://raw.githubusercontent.com/timvort/internet-/main/script.user.js
 // @downloadURL  https://raw.githubusercontent.com/timvort/internet-/main/script.user.js
 // ==/UserScript==
-//架子是vettel大神搭的，我改改而已
 (function() {
     'use strict';
 
+    // ========== 配置常量 ==========
+    const TEST_KEYWORDS = ["题", "评估", "测试", "测验", "考核"];
+
+    // ========== 工具函数 ==========
+
     // 显示加载成功提示
     function showLoadSuccessNotification(message = 'sxyzzy脚本加载成功！注意地址栏是否阻止弹出窗口了！！！') {
+        if(!document.URL.includes('qlteacher') || !document.URL.includes('lesson')) {
+            return;
+        }
+
         if(document.getElementById('qlteacher-script-notification')) return;
         const notification = document.createElement('div');
         notification.id = 'qlteacher-script-notification';
@@ -38,30 +46,30 @@
             font-family: Arial, sans-serif;
             font-size: 14px;
         `;
-        notification.textContent = message;
+        notification.textContent = message + ` (版本: ${GM_info?.script?.version || '2.3.6'})`;
         document.body.appendChild(notification);
-        // 3秒后自动消失
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
+        setTimeout(() => notification.remove(), 3000);
     }
 
-    // 在脚本开始时显示初始通知
-    showLoadSuccessNotification();
-
-    // 监听窗口活跃状态
-    function isFocus(){
-        if(!document.hidden){
-            window.location.reload();
-            console.log("Refresh the course status!");
+    // 安全点击元素
+    function safeClick(selector, description) {
+        try {
+            const elements = document.querySelectorAll(selector);
+            if(elements.length > 0) {
+                elements[0].click();
+                showLoadSuccessNotification(`成功点击: ${description}`);
+                return true;
+            }
+        } catch(e) {
+            console.error(`点击 ${description} 失败:`, e);
         }
+        return false;
     }
-    document.addEventListener("visibilitychange", isFocus);
 
-    function open(){
-        window.location.reload();
-    }
-    function coursesPage(){
+    // ========== 核心功能函数 ==========
+
+    // 课程页面处理
+    function coursesPage() {
         if(document.URL.includes('yxjc.qlteacher.com/project/yey2025/lesson/learn') ||
            document.URL.includes('yxjc.qlteacher.com/project/xx2025/lesson/learn') ||
            document.URL.includes('yxjc.qlteacher.com/project/cz2025/lesson/learn') ||
@@ -121,20 +129,18 @@
     }
     setInterval(coursePage, 1000);
 
-    // play函数
+    // play函数 - 简化版，不封装按钮点击逻辑
     function play(){
         var patt = /^https:\/\/player.qlteacher.com\/learning\/[^=]*/;
         if(patt.test(document.URL)){
             // 纯测试题的课程 - 增强版
             function handleTestPage() {
-                // 尝试多种选择器方式
                 var elements = document.getElementsByClassName("segmented-text-ellipsis mr-16");
                 if(elements.length === 0) {
-                    // 如果第一种选择器没找到，尝试只用第一个类名
                     elements = document.getElementsByClassName("segmented-text-ellipsis");
                 }
 
-                if(elements.length > 0 && elements[0].innerText.includes("测试题")) {
+                if(elements.length > 0 && elements[0].innerText.includes("题")||elements[0].innerText.includes("评估")) {
                     // 找到测试题页面
                     showLoadSuccessNotification('检测到测试题页面，即将开始答题操作...');
 
@@ -145,29 +151,26 @@
                             labels[0].click();
                         }
                     }
-                    return true; // 表示成功处理了测试题页面
+                    return true;
                 }
-                return false; // 表示未找到测试题页面
+                return false;
             }
 
             // 主检测函数
             function checkTestPage() {
                 if(handleTestPage()) {
-                    return; // 如果已处理测试题页面，则不再继续检查
+                    return;
                 }
-
-                // 如果没找到，稍后再试
                 setTimeout(checkTestPage, 500);
             }
 
             // 初始检查
             checkTestPage();
 
-            // 同时也监听DOM变化(针对Angular动态加载内容)
+            // 监听DOM变化
             if(typeof MutationObserver !== 'undefined') {
                 var observer = new MutationObserver(function(mutations) {
                     if(handleTestPage()) {
-                        // 如果已处理测试题页面，可以停止观察(可选)
                         // observer.disconnect();
                     }
                 });
@@ -178,26 +181,42 @@
                 });
             }
 
-            // 以下代码应该放在checkTestPage()外部，作为play()函数的一部分
-            // 提交答案
+            // ========== 直接写出提交按钮处理逻辑 ==========
+            // 提交答案 - 直接查找按钮并点击
             var buttons = document.querySelectorAll("button");
             for(var k=0; k<buttons.length; k++){
                 var innerTextElement = buttons[k].getElementsByClassName("ng-star-inserted");
                 if(innerTextElement.length > 0 &&
                    innerTextElement[0].innerText == "提交"){
-                    // 点击提交按钮前
+                    // 在点击提交按钮前显示通知
+                    showLoadSuccessNotification('检测到"提交"按钮，即将点击...');
+                    buttons[k].click();
+                    break;
+                }
+                // 增加对"提交答案"文本的匹配
+                else if(innerTextElement.length > 0 &&
+                       innerTextElement[0].innerText == "提交答案"){
+                    showLoadSuccessNotification('检测到"提交答案"按钮，即将点击...');
                     buttons[k].click();
                     break;
                 }
             }
 
-            // 确定提交
+            // 确定提交 - 直接查找按钮并点击
             buttons = document.querySelectorAll("button");
             for(k=0; k<buttons.length; k++){
                 var innerTextElement = buttons[k].getElementsByClassName("ng-star-inserted");
                 if(innerTextElement.length > 0 &&
                    innerTextElement[0].innerText == "确定"){
-                    // 点击确定按钮
+                    // 在点击确定按钮前显示通知
+                    showLoadSuccessNotification('检测到"确定"按钮，即将点击...');
+                    buttons[k].click();
+                    break;
+                }
+                // 增加对"确认"文本的匹配
+                else if(innerTextElement.length > 0 &&
+                       innerTextElement[0].innerText == "确认"){
+                    showLoadSuccessNotification('检测到"确认"按钮，即将点击...');
                     buttons[k].click();
                     break;
                 }
@@ -259,7 +278,6 @@
             // 如果完成，则退出
             var countDownElements = document.getElementsByClassName('count-down ng-star-inserted');
             if(countDownElements.length > 0 && countDownElements[0].innerText=="已完成"){
-                // 关闭窗口
                 window.close();
             }
         }
